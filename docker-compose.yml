@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./edge_server_v7
+    container_name: edge_server
+    ports:
+      - "8085:8085"
+    depends_on:
+      - mqtt-broker
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:h2:mem:trust_eval
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=admin
+      - SPRING_H2_CONSOLE_ENABLED=true
+      - SPRING_H2_CONSOLE_PATH=/h2-console
+      - SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS=true
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - MQTT_BROKER=tcp://mqtt-broker:1883
+    networks:
+      - backend
+    restart: always  # Restart automatically on failure
+    volumes:
+      - shared-data:/app/public-data  # Mount shared volume in backend container
+
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt-broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - backend
+    restart: always  # Restart automatically
+
+  frontend:
+    build: ./portail_web/my-app
+    container_name: react_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - app
+    networks:
+      - backend
+    restart: always
+    volumes:
+      - shared-data:/usr/share/nginx/html/public  # Mount shared volume in frontend container
+      - ./portail_web/my-app/nginx.conf:/etc/nginx/conf.d/default.conf  # 🔥 Utilisation du fichier nginx.conf personnalisé
+    # command: ["npm", "install"]  # Uncomment if needed to force dependency installation
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  shared-data:
